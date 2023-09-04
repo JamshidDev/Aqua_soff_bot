@@ -9,7 +9,7 @@ const {
 require('dotenv').config()
 const Database = require("./db");
 
-const { add_order, payment_message_id, my_orders } = require("./controllers/orderController")
+const { add_order, payment_message_id, my_orders, active_orders, delivered_orders, rejected_order } = require("./controllers/orderController")
 const { get_categories } = require("./controllers/categoryController")
 const { get_userLang, set_userLang, register_user, check_user, change_user_fullname, change_user_phone_number } = require("./controllers/userController");
 const customLogger = require("./config/customLogger");
@@ -47,7 +47,9 @@ bot.use(session({
                     order_amout: null,
                     delivery_location: null,
 
-                }
+                },
+                selected_order: null,
+
             }
         },
         storage: new MemorySessionStorage(),
@@ -97,6 +99,9 @@ bot.use(async (ctx, next) => {
             await ctx.conversation.exit(key);
         }
     }
+    ctx.config = {
+        is_admin: ctx.from?.id == admin_id
+    }
     await next()
 
 })
@@ -120,7 +125,7 @@ const payment_types_btn_menu = new Menu("payment_types_btn_menu")
                     await ctx.answerCallbackQuery();
                     console.log(ctx.msg.message_id);
                     await ctx.reply("Tez orada ishga tushadi...")
-                   
+
                 })
                 .row();
         })
@@ -135,6 +140,7 @@ bot.use(createConversation(change_fullname_conversation));
 bot.use(createConversation(change_phone_number_conversation));
 bot.use(createConversation(user_feedback_conversation));
 bot.use(createConversation(order_product_conversation));
+bot.use(createConversation(admin_main_menu_conversation));
 
 
 
@@ -230,7 +236,11 @@ async function register_user_conversation(conversation, ctx) {
 
     await register_user(data);
     await ctx.reply(ctx.t("success_register_text"));
-    await ctx.conversation.enter("main_menu_conversation");
+    if (ctx.config.is_admin) {
+        await ctx.conversation.enter("admin_main_menu_conversation");
+    } else {
+        await ctx.conversation.enter("main_menu_conversation");
+    }
 
 
 }
@@ -374,32 +384,32 @@ async function order_product_conversation(conversation, ctx) {
         }
         let new_order = await add_order(data);
         let back_to_main_menu = new Keyboard()
-        .text(ctx.t("back_to_btn_menu"))
-        .resized();
+            .text(ctx.t("back_to_btn_menu"))
+            .resized();
         await ctx.reply(ctx.t("order_success_message", {
             order_number: new_order.order_number
         }), {
             parse_mode: "HTML",
-            reply_markup:back_to_main_menu
+            reply_markup: back_to_main_menu
         });
-       let payment_message = await ctx.reply(ctx.t("order_payment_info",{
-            order_number:new_order.order_number,
-            order_amout:new_order.order_amount,
-            order_price:new_order.order_amount*15000,
-            order_date:new Date(new_order.created_at).toLocaleDateString()
-        }),{
-            parse_mode:"HTML",
-            reply_markup:payment_types_btn_menu,
+        let payment_message = await ctx.reply(ctx.t("order_payment_info", {
+            order_number: new_order.order_number,
+            order_amout: new_order.order_amount,
+            order_price: new_order.order_amount * 15000,
+            order_date: new Date(new_order.created_at).toLocaleDateString()
+        }), {
+            parse_mode: "HTML",
+            reply_markup: payment_types_btn_menu,
         });
         await payment_message_id({
-            order_id:new_order._id,
+            order_id: new_order._id,
             msg_id: payment_message.message_id
         })
 
-        await ctx.api.sendMessage(admin_id, ctx.t("new_order_nessage_to_admin",{
-            order_number:new_order.order_number
-        }),{
-            parse_mode:"HTML"
+        await ctx.api.sendMessage(admin_id, ctx.t("new_order_nessage_to_admin", {
+            order_number: new_order.order_number
+        }), {
+            parse_mode: "HTML"
         })
     } else {
         await ctx.conversation.enter("main_menu_conversation");
@@ -408,7 +418,22 @@ async function order_product_conversation(conversation, ctx) {
 
 }
 
+async function admin_main_menu_conversation(conversation, ctx) {
+    let admin_keyboards = new Keyboard()
+        .text("💎 Buyurtmalar")
+        .text("🚚 Yetkazilgan buyurtma")
+        .row()
+        .text("📈 Kunlik hisobot")
+        .text("📊 Umumiy statistika")
+        .resized();
 
+    await ctx.reply("⚡️ Asosiy Admin menu ⚡️", {
+        reply_markup: admin_keyboards
+    });
+    return
+
+
+}
 
 
 
@@ -449,7 +474,12 @@ pm.command("start", async (ctx) => {
     let user_id = ctx.from.id;
     let user = await check_user(user_id);
     if (user) {
-        await ctx.conversation.enter("main_menu_conversation");
+        if (ctx.config.is_admin) {
+            await ctx.conversation.enter("admin_main_menu_conversation");
+        } else {
+            await ctx.conversation.enter("main_menu_conversation");
+        }
+
 
     } else {
         await ctx.reply(ctx.t("start_text"), {
@@ -472,6 +502,58 @@ pm.command("start", async (ctx) => {
 
 
 
+const order_details_menu = new Menu("order_details_menu")
+    .text("🛑 Rad etish", async (ctx) => {
+        await ctx.answerCallbackQuery();
+        await ctx.deleteMessage();
+
+        if (ctx.session.session_db.selected_order) {
+
+            let rejected = await rejected_order(ctx.session.session_db.selected_order._id);
+            if (rejected) {
+
+                await ctx.reply(`<i>✅ <b>${rejected.order_number}</b> raqamli buyurtma rad etildi!</i>`, {
+                    parse_mode: "HTML"
+                })
+                let admin_lang = await ctx.i18n.getLocale();
+                let user = await get_userLang(ctx.from.id)
+                if(user){
+                    await ctx.i18n.setLocale(user.lang);
+                    await ctx.api.sendMessage(rejected.client_id, ctx.t("reject_order_message_text", {
+                        order_number: rejected.order_number
+                    }),{
+                        parse_mode:"HTML"
+                    })
+                    console.log(admin_lang);
+                    await ctx.i18n.setLocale(admin_lang);
+                }
+               
+               
+            } else {
+                await ctx.reply(`<i>🛑 <b>${ctx.session.session_db.selected_order.order_number}</b> raqamli buyurtma rad etish mumkin emas!</i>`, {
+                    parse_mode: "HTML"
+                })
+            }
+
+        } else {
+            await ctx.reply("⚠️ Eskirgan xabar iltimos qayta urining!")
+        }
+    })
+    .text("💸 To'lov ma'lumoti", async (ctx) => {
+        await ctx.answerCallbackQuery();
+        await ctx.deleteMessage();
+        await ctx.reply("Tez orada ishga tushadi...")
+    })
+    .row()
+    .text("👨‍💼 Buyurtmachi", async (ctx) => {
+        await ctx.reply("Yakunlash")
+    })
+    .row()
+    .text("✅ Yakunlash", async (ctx) => {
+        await ctx.reply("✅ Yakunlash")
+    })
+
+pm.use(order_details_menu)
 
 
 
@@ -483,7 +565,33 @@ pm.command("start", async (ctx) => {
 
 
 
+// language menu
+const order_list_menu = new Menu("order_list_menu")
+    .dynamic(async (ctx, range) => {
+        let list = await active_orders();
+        list.forEach((item) => {
+            range
+                .text(`${item.order_number} | ${new Date(item.created_at).toLocaleDateString()} ${(item.is_payment ? " 💎" : " *")}`, async (ctx) => {
+                    await ctx.answerCallbackQuery();
+                    ctx.session.session_db.selected_order = item;
+                    await ctx.reply(`
+📄 Buyurtma raqami: <b>${item.order_number}</b> 
+📍 Turi: <b>${item.category_id.name}</b>
+📦 Miqdori: <b>${item.order_amount}</b> ta
+💰 Narxi: <b>${item.order_amount * 15000}</b> so'm
+🕓 Sana: <b>${new Date(item.created_at).toLocaleString()}</b>
+💸 To'lov holati: <b>${item.is_payment ? "✅" : "❌"}</b>
 
+📞 Aloqa: <a href="tg://user?id=${item.client_id}">Telegram</a>
+`, {
+                        parse_mode: "HTML",
+                        reply_markup: order_details_menu
+                    })
+                })
+                .row();
+        })
+    })
+pm.use(order_list_menu)
 
 
 
@@ -558,32 +666,32 @@ bot.filter(hears("cancel_action_text"), async (ctx) => {
 // my orders info
 bot.filter(hears("my_order_text"), async (ctx) => {
     let back_main_menu = new Keyboard()
-    .text(ctx.t("back_to_btn_menu"))
-    .resized();
+        .text(ctx.t("back_to_btn_menu"))
+        .resized();
 
     let my_orders_list = await my_orders(ctx.from.id);
-    if(my_orders_list.length >0){
+    if (my_orders_list.length > 0) {
         let my_order_text = "<b>🛒 Buyurtmalarim</b> \n <i>🚚 Yetkazib berilishi kutilayotgan buyurtmalar.</i>"
-        for(const product of my_orders_list){
+        for (const product of my_orders_list) {
             let template_text = `\n
 📄 Buyurtma raqami: <b>${product.order_number}</b> 
 📍 Buyurtma turi: <b>${product.category_id.name}</b>
 📦 Buyurtma miqdori: <b>${product.order_amount}</b> ta
-💰 Buyurtma narxi: <b>${product.order_amount*15000}</b> so'm
+💰 Buyurtma narxi: <b>${product.order_amount * 15000}</b> so'm
 🕓 Buyurtma sanasi: <b>${new Date(product.created_at).toLocaleString()}</b>
-💸 To'lov holati: <b>${product.is_payment? "✅" : "❌"}</b>`
-            my_order_text =my_order_text +template_text;
+💸 To'lov holati: <b>${product.is_payment ? "✅" : "❌"}</b>`
+            my_order_text = my_order_text + template_text;
         }
 
         await ctx.reply(my_order_text, {
-            parse_mode:"HTML",
-            reply_markup:back_main_menu
+            parse_mode: "HTML",
+            reply_markup: back_main_menu
         })
 
 
-    }else{
+    } else {
         await ctx.reply(ctx.t("no_my_order_yet"), {
-            parse_mode:"HTML"
+            parse_mode: "HTML"
         })
     }
 
@@ -662,6 +770,22 @@ bot.filter(hears("language_ru"), async (ctx) => {
 });
 
 
+// admin panel keyboards
+bot.hears("💎 Buyurtmalar", async (ctx) => {
+    await ctx.reply(`
+<b>Buyurtmalar ro'yhati</b>   
+
+<i>💎 - To'lov qilingan buyurtmalar</i> 
+<i><b>*</b> - To'lov qilinmagan buyurtmalar</i> 
+
+<i>🫵 Buyurtma tavsilotlarini ko'rish uchun buyurtma ustiga bosing!</i>
+    `, {
+        parse_mode: "HTML",
+        reply_markup: order_list_menu
+    })
+})
+
+
 
 
 
@@ -670,7 +794,11 @@ bot.use(async (ctx, next) => {
     let user = await get_userLang(ctx.from.id)
     if (user) {
         await ctx.i18n.setLocale(user.lang);
-        await ctx.conversation.enter("main_menu_conversation");
+        if (ctx.config.is_admin) {
+            await ctx.conversation.enter("admin_main_menu_conversation");
+        } else {
+            await ctx.conversation.enter("main_menu_conversation");
+        }
     }
 
     next()

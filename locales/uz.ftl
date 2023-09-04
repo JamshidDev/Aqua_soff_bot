@@ -8,10 +8,10 @@ language_ru = 🇷🇺 Rus tili
 phone_btn_text = 📞 Telefon raqam yuborish
 
 register_phone_text = 📞 Ro'yxatdan o'tish uchun telefon raqamingizni kiriting.
-    Masalan <b>995016004</b>
+    Masalan <b>99*******</b>
 
 invalid_phone_text = <b>⚠️ Noto'g'ri formatdagi telefon raqam kiritildi!</b>
-    Masalan <b>995016004</b>
+    Masalan <b>99*******</b>
 
 register_fullName_text = Iltimos F.I.SH kiriting!
 
@@ -74,7 +74,7 @@ feedback_comment_text = Izoh qoldiring. Sizning fikringiz biz uchun muhim.
 comment_success_text = ✅ Sizning xabaringiz adminga yuborildi!
 
 product_details = <b>🛍  Mahsulot haqida qisqacha:</b>
-    Hajmi: <b>19 L</b>
+    Hajmi: <b>18.9 L</b>
     Narxi (1 dona): <b>15 000 so'm</b>
 
     <i>Mahsulot miqdorini kiriting</i>
@@ -92,7 +92,7 @@ location_btn_text = 📍 Lokatsiyani yuborish
 order_success_message = <i>✅ Buyurtma qabul qilindi. Buyurtma raqami: <b>{$order_number}</b></i>
 
 order_payment_info = <b>💸  To'lov qilish!</b>
-     <i>📍 Buyurtma turi: <b>19 L</b></i>
+     <i>📍 Buyurtma turi: <b>18.9 L</b></i>
      <i>📄 Buyurtma raqami: <b>{$order_number}</b></i>
      <i>📦 Buyurtma miqdori: <b>{$order_amout}</b> ta</i>
      <i>💰 Umumiy narx: <b>{$order_price}</b> so'm</i>
@@ -104,5 +104,9 @@ click_pay_menu_text = To'lov qilish (Click)
 new_order_nessage_to_admin = <i>💎 Yangi buyurtma kelib tushdi. Buyurtma raqami: <b>{$order_number}</b></i>
 
 no_my_order_yet = <i>📦 Sizda buyurtmalar yo'q</i>
+
+reject_order_message_text = <i>❌ Sizning <b>{$order_number}</b> raqamli buyurtmangiz rad etildi!</i>
+
+
 
 
