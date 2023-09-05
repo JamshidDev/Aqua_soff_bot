@@ -96,7 +96,24 @@ const rejected_order = async (order_id)=>{
         });
     }
 }
-
+const check_delivered_order = async (order_id)=>{
+    try {
+        let order = await Order.findOne({ _id: order_id,is_payment:true  });
+        if (order) {
+           return await Order.findByIdAndUpdate(order_id, {
+            is_deliveried: true,
+            });
+        } else {
+            console.log("Order not found for check delivered order....");
+            return null
+        }
+    } catch (error) {
+        customLogger.log({
+            level: 'error',
+            message: error
+        });
+    }
+}
 
 
 
@@ -111,4 +128,5 @@ module.exports = {
     active_orders,
     delivered_orders,
     rejected_order,
+    check_delivered_order,
 }

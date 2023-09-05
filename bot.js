@@ -9,11 +9,12 @@ const {
 require('dotenv').config()
 const Database = require("./db");
 
-const { add_order, payment_message_id, my_orders, active_orders, delivered_orders, rejected_order } = require("./controllers/orderController")
+const { add_order, payment_message_id, my_orders, active_orders, delivered_orders, rejected_order,check_delivered_order } = require("./controllers/orderController")
 const { get_categories } = require("./controllers/categoryController")
 const { get_userLang, set_userLang, register_user, check_user, change_user_fullname, change_user_phone_number } = require("./controllers/userController");
 const customLogger = require("./config/customLogger");
 const { log } = require("winston");
+const { cli } = require("winston/lib/winston/config");
 
 
 const bot_token = process.env.BOT_TOKEN;
@@ -517,18 +518,17 @@ const order_details_menu = new Menu("order_details_menu")
                 })
                 let admin_lang = await ctx.i18n.getLocale();
                 let user = await get_userLang(ctx.from.id)
-                if(user){
+                if (user) {
                     await ctx.i18n.setLocale(user.lang);
                     await ctx.api.sendMessage(rejected.client_id, ctx.t("reject_order_message_text", {
                         order_number: rejected.order_number
-                    }),{
-                        parse_mode:"HTML"
+                    }), {
+                        parse_mode: "HTML"
                     })
-                    console.log(admin_lang);
                     await ctx.i18n.setLocale(admin_lang);
                 }
-               
-               
+
+
             } else {
                 await ctx.reply(`<i>🛑 <b>${ctx.session.session_db.selected_order.order_number}</b> raqamli buyurtma rad etish mumkin emas!</i>`, {
                     parse_mode: "HTML"
@@ -546,11 +546,63 @@ const order_details_menu = new Menu("order_details_menu")
     })
     .row()
     .text("👨‍💼 Buyurtmachi", async (ctx) => {
-        await ctx.reply("Yakunlash")
+        await ctx.answerCallbackQuery();
+        await ctx.deleteMessage();
+        let order = ctx.session.session_db.selected_order;
+        if (order) {
+            let client = await check_user(order.client_id);
+            if (client) {
+                await ctx.reply(`
+<i>📄 Buyurtmachi ma'lumolari</i>  
+
+📦 Buyurtma raqami: <b>${order.order_number}</b>               
+👨‍💼 F.I.SH:   <a href="tg://user?id=${client.user_id}">${client.full_name} </a>       
+📞 TELL: <b>${client.phone}</b>          
+                            `, {
+                    parse_mode: "HTML"
+                })
+            }
+
+
+        } else {
+            await ctx.reply("⚠️ Eskirgan xabar iltimos qayta urining!")
+        }
+        let client = await check_user()
+    })
+    .text("📍 Manzil", async (ctx) => {
+        await ctx.answerCallbackQuery();
+        await ctx.deleteMessage();
+        let order = ctx.session.session_db.selected_order;
+
+        if (order) {
+            let title_msg = await ctx.reply(`📍 <b>${order.order_number}</b> raqamli buyurtma manzili:`, {
+                parse_mode: "HTML"
+            });
+            await ctx.api.sendLocation(ctx.from.id, order.delivery_location.latitude, order.delivery_location.longitude, {
+                reply_to_message_id: title_msg.message_id
+            })
+        } else {
+            await ctx.reply("⚠️ Eskirgan xabar iltimos qayta urining!")
+        }
+
+
     })
     .row()
     .text("✅ Yakunlash", async (ctx) => {
-        await ctx.reply("✅ Yakunlash")
+        await ctx.answerCallbackQuery();
+        await ctx.deleteMessage();
+        let order = ctx.session.session_db.selected_order;
+        if (order) {
+            let deliveed_order = await check_delivered_order(order._id);
+            if(deliveed_order){
+                await ctx.reply(`✅ ${order.order_number} raqamli buyurtmani yanunlandi!`)
+            }else{
+                await ctx.reply(`❌ ${order.order_number} raqamli buyurtmani yakunlash mumkin emas!`)
+            }
+        } else {
+            await ctx.reply("⚠️ Eskirgan xabar iltimos qayta urining!")
+        }
+        let client = await check_user()
     })
 
 pm.use(order_details_menu)
