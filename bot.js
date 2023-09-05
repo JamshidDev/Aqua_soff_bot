@@ -11,7 +11,7 @@ const Database = require("./db");
 
 const { add_order, payment_message_id, my_orders, active_orders, delivered_orders, rejected_order,check_delivered_order } = require("./controllers/orderController")
 const { get_categories } = require("./controllers/categoryController")
-const { get_userLang, set_userLang, register_user, check_user, change_user_fullname, change_user_phone_number } = require("./controllers/userController");
+const { get_userLang, set_userLang, register_user, check_user, change_user_fullname, change_user_phone_number,remove_user } = require("./controllers/userController");
 const customLogger = require("./config/customLogger");
 const { log } = require("winston");
 const { cli } = require("winston/lib/winston/config");
@@ -77,6 +77,7 @@ bot.use(conversations());
 
 bot.on("my_chat_member", async (ctx) => {
     if (ctx.update.my_chat_member.new_chat_member.status == "kicked") {
+        await remove_user(ctx.from.id)
         const stats = await ctx.conversation.active();
         for (let key of Object.keys(stats)) {
             await ctx.conversation.exit(key);
@@ -253,6 +254,9 @@ async function main_menu_conversation(conversation, ctx) {
         .row()
         .text(ctx.t("my_order_text"))
         .text(ctx.t("feedback_menu_text"))
+        .row()
+        .text(ctx.t("gift_menu_text"))
+        .text(ctx.t("call_center_menu_text"))
         .row()
         .text(ctx.t("about_menu_text"))
         .text(ctx.t("setting_menu_text"))
@@ -800,6 +804,20 @@ bot.filter(hears("about_menu_text"), async (ctx) => {
         parse_mode: "HTML",
     })
 });
+// Contacts
+bot.filter(hears("call_center_menu_text"), async (ctx) => {
+   await ctx.reply(ctx.t("call_center_info_text"), {
+    parse_mode:"HTML"
+   })
+});
+
+// gift
+bot.filter(hears("gift_menu_text"), async (ctx) => {
+    await ctx.reply(ctx.t("gift_info_text"), {
+     parse_mode:"HTML"
+    })
+ });
+
 // selected uz language
 bot.filter(hears("language_uz"), async (ctx) => {
     await ctx.i18n.setLocale("uz");

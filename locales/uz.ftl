@@ -27,6 +27,10 @@ my_order_text = 🛒 Buyurtmalarim
 
 feedback_menu_text = ✍️ Izoh qoldirish
 
+call_center_menu_text = ☎️ Kontaktlar
+
+gift_menu_text =🎁 Aksiya
+
 about_menu_text = ℹ️ Biz haqimizda
 
 setting_menu_text = ⚙️ Sozlamalar
@@ -107,6 +111,15 @@ no_my_order_yet = <i>📦 Sizda buyurtmalar yo'q</i>
 
 reject_order_message_text = <i>❌ Sizning <b>{$order_number}</b> raqamli buyurtmangiz rad etildi!</i>
 
+call_center_info_text = <b>Kontaktlar</b>
+     <i>🔍 Savol va takliflar uchun raqamlar:</i>
+
+     <i>☎️ Call markaz: <b>+998 (99) 140-09-99</b></i>
+     <i>☎️ Qo'shimcha raqam: <b>+998 (97) 776-17-17</b></i>
+
+gift_info_text  = <b> 🎁🎁Aksiya🎁🎁</b>
+
+    <i>🎉 300 ta suvga (4,5 mln so'm) to’lov qilganga 1 dona kuler qo’shib beriladi</i>
 
 
 
