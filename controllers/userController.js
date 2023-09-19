@@ -108,6 +108,16 @@ const change_user_phone_number = async(data)=>{
         });
     }
 }
+ const get_active_user_list = async()=>{
+    try{
+        return await User.find({active_user:true }).exec();
+    }catch(error){
+        customLogger.log({
+            level: 'error',
+            message: error
+        });
+    }
+ }
 
 module.exports = {
     register_user,
@@ -117,4 +127,5 @@ module.exports = {
     check_user,
     change_user_fullname,
     change_user_phone_number,
+    get_active_user_list,
 }

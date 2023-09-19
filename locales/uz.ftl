@@ -122,4 +122,18 @@ gift_info_text  = <b> 🎁🎁Aksiya🎁🎁</b>
     <i>🎉 300 ta suvga (4,5 mln so'm) to’lov qilganga 1 dona kuler qo’shib beriladi</i>
 
 
+order_payment_status_text = <b>⚠️ Cheklangan</b>
 
+    <i>Bu buyurtma bekor qilingan yoki allaqachon to'lov amalga oshirilgan!</i>
+
+payment_title_text = 💰 Buyurtma raqami {$order_number} ({$order_type})
+
+payment_details_text =🚚 {$order_number} raqamli buyurtmangizni tasdiqlash uchun to'lov qilinishingiz shart. To'lov amalga oshirilgandan keyin ma'sul xodimlar sizga aloqaga chiqadi.
+
+successfully_payment_text = <b>✅ To'lov amalga oshirildi</b>
+
+    🔰 Buyurtma raqami: <b>{$order_number}</b>  
+    💵 To'langan summa: <b>{$order_price}</b> so'm 
+    🗓 To'lov sanasi: <b>{$payment_date}</b>
+
+many_request_text = ❗️ Iltimos, ko'p so'rov yuborishdan saqlaning!
