@@ -24,7 +24,8 @@ const bot_token = process.env.BOT_TOKEN;
 const payme_tokent = process.env.PAYME_PROVIDER_TOKEN;
 
 
-const admin_id = 5604998397;
+const admin_id = 5982603775;
+const admin_list = [5982603775, 5604998397]
 const connect_phone = '+998(97) 776-17-17'
 
 
@@ -58,24 +59,34 @@ bot.on(":successful_payment", async (ctx) => {
         payment_details: ctx.msg.successful_payment
     }
     await add_payment_histry(data)
-    await ctx.reply(ctx.t("successfully_payment_text", {
-        order_number: order.order_number,
-        order_price: order_price / 100,
-        payment_date: new Date().toLocaleString(),
-    }))
+
+    await ctx.reply(`
+<b>✅ To'lov amalga oshirildi</b>
+🔰 Buyurtma raqami: <b>${order.order_number}</b>  
+💵 To'langan summa: <b>${order_price / 100}</b> so'm 
+🗓 To'lov sanasi: <b>${new Date().toLocaleString()}</b>  
+
+
+<b> ✅ Платеж произведен</b>
+🔰 Номер заказа: <b>${order.order_number}</b>
+💵 Оплаченная сумма: <b>${order_price / 100}</b> сум.
+🗓 Дата платежа: <b>${new Date().toLocaleString()}</b>
+    `,{ 
+        parse_mode:"HTML"
+    })
+   
     await ctx.api.sendMessage(admin_id, `<b>💰 To'lov amalga oshirildi</b>
 🔰 Buyurtma raqami: <b>${order.order_number}</b>  
-💵 To'langan summa: <b>${order_price}</b> so'm `, {
+💵 To'langan summa: <b>${order_price / 100}</b> so'm `, {
         parse_mode: "HTML"
     })
 })
-
 
 bot.on("pre_checkout_query", async (ctx) => {
     let pre_checkout_query_id = ctx.update.pre_checkout_query.id;
     let order_id = ctx.update.pre_checkout_query.invoice_payload;
     let order = await check_payemt_order(order_id);
-    if (order.length == 1) {
+    if (order) {
         await ctx.api.answerPreCheckoutQuery(pre_checkout_query_id, true);
     } else {
         await ctx.api.answerPreCheckoutQuery(pre_checkout_query_id, false, {
@@ -83,6 +94,7 @@ bot.on("pre_checkout_query", async (ctx) => {
         });
     }
 })
+
 
 
 
@@ -127,6 +139,8 @@ bot.api.config.use(autoRetry({
     maxRetryAttempts: 1, // only repeat requests once
     maxDelaySeconds: 5, // fail immediately if we have to wait >5 seconds
 }));
+
+
 
 
 bot.use(
@@ -180,7 +194,7 @@ bot.use(async (ctx, next) => {
         }
     }
     ctx.config = {
-        is_admin: ctx.from?.id == admin_id
+        is_admin: admin_list.includes(ctx.from?.id)
     }
     await next()
 
@@ -1044,7 +1058,7 @@ bot.hears("📈 Kunlik hisobot", async (ctx) => {
 
 💎 Buyurtmalar soni: <b>${statistic_data.all_count}</b>
 🚚 Yetkazilganlar : <b>${statistic_data.deliveried_count}</b>
-💰 To'lov qiingan : <b>${statistic_data.payment_count}</b>
+💰 To'lov qilingan : <b>${statistic_data.payment_count}</b>
 ❗️ Rad etilgan : <b>${statistic_data.reject_count}</b>
 
 🗓 Sana : <b>${new Date().toLocaleDateString()}</b>
@@ -1061,7 +1075,7 @@ bot.hears("📊 Umumiy statistika", async (ctx) => {
  
  💎 Buyurtmalar soni: <b>${statistic_data.all_count}</b>
  🚚 Yetkazilganlar : <b>${statistic_data.deliveried_count}</b>
- 💰 To'lov qiingan : <b>${statistic_data.payment_count}</b>
+ 💰 To'lov qilingan : <b>${statistic_data.payment_count}</b>
  ❗️ Rad etilgan : <b>${statistic_data.reject_count}</b>
  
  👤 Mijozlar : <b>${statistic_data.users_count}</b>
