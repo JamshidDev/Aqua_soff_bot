@@ -8,20 +8,24 @@ const {
 } = require("@grammyjs/conversations");
 require('dotenv').config()
 const Database = require("./db");
+const { limit } = require("@grammyjs/ratelimiter");
+const { autoRetry } = require("@grammyjs/auto-retry");
 
-const { add_order, payment_message_id, my_orders, active_orders, delivered_orders, rejected_order,check_delivered_order } = require("./controllers/orderController")
+const { add_order, payment_message_id, my_orders, active_orders, statistic_daily, general_statistic, check_payemt_order, update_order_payment, get_order_by_msgId, rejected_order, check_delivered_order } = require("./controllers/orderController")
 const { get_categories } = require("./controllers/categoryController")
-const { get_userLang, set_userLang, register_user, check_user, change_user_fullname, change_user_phone_number } = require("./controllers/userController");
+const { get_userLang, get_active_user_list, set_userLang, register_user, check_user, change_user_fullname, change_user_phone_number, remove_user } = require("./controllers/userController");
+const { add_payment_histry } = require("./controllers/paymentControllers")
 const customLogger = require("./config/customLogger");
 const { log } = require("winston");
-const { cli } = require("winston/lib/winston/config");
+
 
 
 const bot_token = process.env.BOT_TOKEN;
 const payme_tokent = process.env.PAYME_PROVIDER_TOKEN;
 
 
-const admin_id = 5604998397;
+const admin_id = 5982603775;
+const admin_list = [5982603775, 5604998397]
 const connect_phone = '+998(97) 776-17-17'
 
 
@@ -32,6 +36,68 @@ const connect_phone = '+998(97) 776-17-17'
 
 
 const bot = new Bot(bot_token);
+
+
+
+
+
+
+
+
+
+bot.on(":successful_payment", async (ctx) => {
+    await ctx.deleteMessage()
+    let order_id = ctx.msg.successful_payment.invoice_payload;
+    let order_price = ctx.msg.successful_payment.total_amount;
+
+
+    let order = await update_order_payment(order_id)
+    let data = {
+        client_id: ctx.from.id,
+        order_id: ctx.msg.successful_payment.invoice_payload,
+        payment_amount: ctx.msg.successful_payment.total_amount / 100,
+        payment_details: ctx.msg.successful_payment
+    }
+    await add_payment_histry(data)
+
+    await ctx.reply(`
+<b>✅ To'lov amalga oshirildi</b>
+🔰 Buyurtma raqami: <b>${order.order_number}</b>  
+💵 To'langan summa: <b>${order_price / 100}</b> so'm 
+🗓 To'lov sanasi: <b>${new Date().toLocaleString()}</b>  
+
+
+<b> ✅ Платеж произведен</b>
+🔰 Номер заказа: <b>${order.order_number}</b>
+💵 Оплаченная сумма: <b>${order_price / 100}</b> сум.
+🗓 Дата платежа: <b>${new Date().toLocaleString()}</b>
+    `,{ 
+        parse_mode:"HTML"
+    })
+   
+    await ctx.api.sendMessage(admin_id, `<b>💰 To'lov amalga oshirildi</b>
+🔰 Buyurtma raqami: <b>${order.order_number}</b>  
+💵 To'langan summa: <b>${order_price / 100}</b> so'm `, {
+        parse_mode: "HTML"
+    })
+})
+
+bot.on("pre_checkout_query", async (ctx) => {
+    let pre_checkout_query_id = ctx.update.pre_checkout_query.id;
+    let order_id = ctx.update.pre_checkout_query.invoice_payload;
+    let order = await check_payemt_order(order_id);
+    if (order) {
+        await ctx.api.answerPreCheckoutQuery(pre_checkout_query_id, true);
+    } else {
+        await ctx.api.answerPreCheckoutQuery(pre_checkout_query_id, false, {
+            error_message: "Buyurtmaga to'lov qilish cheklangan"
+        });
+    }
+})
+
+
+
+
 
 
 bot.use(session({
@@ -69,14 +135,41 @@ const i18n = new I18n({
 });
 bot.use(i18n);
 
+bot.api.config.use(autoRetry({
+    maxRetryAttempts: 1, // only repeat requests once
+    maxDelaySeconds: 5, // fail immediately if we have to wait >5 seconds
+}));
 
 
+
+
+bot.use(
+    limit({
+        // Allow only 3 messages to be handled every 2 seconds.
+        timeFrame: 2000,
+        limit: 3,
+
+        // "MEMORY_STORE" is the default value. If you do not want to use Redis, do not pass storageClient at all.
+        //   storageClient: MEMORY_STORE,
+
+        // This is called when the limit is exceeded.
+        onLimitExceeded: async (ctx) => {
+            await ctx.reply(ctx.t("many_request_text"));
+        },
+
+        // Note that the key should be a number in string format such as "123456789".
+        keyGenerator: (ctx) => {
+            return ctx.from?.id.toString();
+        },
+    })
+);
 
 
 bot.use(conversations());
 
 bot.on("my_chat_member", async (ctx) => {
     if (ctx.update.my_chat_member.new_chat_member.status == "kicked") {
+        await remove_user(ctx.from.id)
         const stats = await ctx.conversation.active();
         for (let key of Object.keys(stats)) {
             await ctx.conversation.exit(key);
@@ -101,31 +194,71 @@ bot.use(async (ctx, next) => {
         }
     }
     ctx.config = {
-        is_admin: ctx.from?.id == admin_id
+        is_admin: admin_list.includes(ctx.from?.id)
     }
     await next()
 
 })
 
-// language menu
+
+
+
+// payment menu
 const payment_types_btn_menu = new Menu("payment_types_btn_menu")
     .dynamic(async (ctx, range) => {
         let list = [{
             name: "payme_pay_menu_text",
             key: "payme"
         },
-        {
-            name: "click_pay_menu_text",
-            key: "click"
-        }
+            // {
+            //     name: "click_pay_menu_text",
+            //     key: "click"
+            // }
 
         ]
         list.forEach((item) => {
             range
                 .text(ctx.t(item.name), async (ctx) => {
                     await ctx.answerCallbackQuery();
-                    console.log(ctx.msg.message_id);
-                    await ctx.reply("Tez orada ishga tushadi...")
+                    let order = await get_order_by_msgId(ctx.msg.message_id);
+
+                    if (order) {
+
+                        // payment details
+                        let order_price = order.order_amount * order.category_id.price;
+
+
+                        let chat_id = ctx.from.id;
+                        let title = ctx.t("payment_title_text", {
+                            order_number: order.order_number,
+                            order_type: order.category_id.name
+                        });
+                        let description = ctx.t("payment_details_text", {
+                            order_number: order.order_number
+                        });
+                        let payload = order._id;
+                        let provider_token = payme_tokent;
+                        let currency = "UZS";
+                        let prices = [{
+                            label: "UZS",
+                            amount: order_price * 100
+                        }]
+                        let payment = await ctx.api.sendInvoice(
+                            chat_id,
+                            title,
+                            description,
+                            payload,
+                            provider_token,
+                            currency,
+                            prices,
+                        );
+                    } else {
+                        await ctx.reply(ctx.t("order_payment_status_text"), {
+                            parse_mode: "HTML"
+                        })
+                    }
+                    // console.log(order);
+
 
                 })
                 .row();
@@ -142,6 +275,7 @@ bot.use(createConversation(change_phone_number_conversation));
 bot.use(createConversation(user_feedback_conversation));
 bot.use(createConversation(order_product_conversation));
 bot.use(createConversation(admin_main_menu_conversation));
+bot.use(createConversation(send_message_conversation));
 
 
 
@@ -253,6 +387,9 @@ async function main_menu_conversation(conversation, ctx) {
         .row()
         .text(ctx.t("my_order_text"))
         .text(ctx.t("feedback_menu_text"))
+        .row()
+        .text(ctx.t("gift_menu_text"))
+        .text(ctx.t("call_center_menu_text"))
         .row()
         .text(ctx.t("about_menu_text"))
         .text(ctx.t("setting_menu_text"))
@@ -422,7 +559,7 @@ async function order_product_conversation(conversation, ctx) {
 async function admin_main_menu_conversation(conversation, ctx) {
     let admin_keyboards = new Keyboard()
         .text("💎 Buyurtmalar")
-        .text("🚚 Yetkazilgan buyurtma")
+        .text("✍️ Xabar yuborish")
         .row()
         .text("📈 Kunlik hisobot")
         .text("📊 Umumiy statistika")
@@ -432,6 +569,70 @@ async function admin_main_menu_conversation(conversation, ctx) {
         reply_markup: admin_keyboards
     });
     return
+
+
+}
+
+async function msg_sender(message, id) {
+    return new Promise((resolve, reject) => {
+        setTimeout(async () => {
+            try {
+                let status = await message.copyMessage(id)
+                resolve(status);
+            } catch (error) {
+                reject(error)
+            }
+
+        }, 3000)
+    })
+}
+
+
+async function send_message_conversation(conversation, ctx) {
+    await ctx.reply(`
+<b>⚠️ Barcha foydalanuvchilarga xabar jo'natish</b> 
+
+<i>‼️ Xabar matnini yozing yoki xabarni botga yo'naltiring ↗️</i>
+    `, {
+        parse_mode: "HTML",
+    })
+    const message_text = await conversation.wait();
+    let keyborad = new Keyboard()
+        .text("❌ Bekor qilish")
+        .text("✅ Tasdiqlash")
+        .resized();
+    await ctx.reply(`
+<i>Xabarni barcha foydalanuvchilarga yuborish uchun <b>✅ Tasdiqlash</b> tugmasini bosing!</i> 
+   
+    `, {
+        reply_markup: keyborad,
+        parse_mode:"HTML",
+    });
+    const msg = await conversation.wait();
+    if (msg.message?.text == '✅ Tasdiqlash') {
+        await ctx.reply("Barchaga xabar yuborish tugallanishini kuting...⏳")
+        let user_list = await get_active_user_list();
+        for (let i = 0; i < user_list.length; i++) {
+            let user = user_list[i];
+            try {
+                let status = await msg_sender(message_text, user.user_id);
+            } catch (error) {
+                console.log(error);
+                await remove_user(user.user_id)
+            }
+        }
+
+        await ctx.reply("Yakunlandi...✅")
+        admin_main_menu_conversation(conversation, ctx);
+        return
+
+    } else {
+        admin_main_menu_conversation(conversation, ctx);
+        return
+    }
+
+
+
 
 
 }
@@ -594,9 +795,9 @@ const order_details_menu = new Menu("order_details_menu")
         let order = ctx.session.session_db.selected_order;
         if (order) {
             let deliveed_order = await check_delivered_order(order._id);
-            if(deliveed_order){
+            if (deliveed_order) {
                 await ctx.reply(`✅ ${order.order_number} raqamli buyurtmani yanunlandi!`)
-            }else{
+            } else {
                 await ctx.reply(`❌ ${order.order_number} raqamli buyurtmani yakunlash mumkin emas!`)
             }
         } else {
@@ -800,6 +1001,20 @@ bot.filter(hears("about_menu_text"), async (ctx) => {
         parse_mode: "HTML",
     })
 });
+// Contacts
+bot.filter(hears("call_center_menu_text"), async (ctx) => {
+    await ctx.reply(ctx.t("call_center_info_text"), {
+        parse_mode: "HTML"
+    })
+});
+
+// gift
+bot.filter(hears("gift_menu_text"), async (ctx) => {
+    await ctx.reply(ctx.t("gift_info_text"), {
+        parse_mode: "HTML"
+    })
+});
+
 // selected uz language
 bot.filter(hears("language_uz"), async (ctx) => {
     await ctx.i18n.setLocale("uz");
@@ -836,9 +1051,47 @@ bot.hears("💎 Buyurtmalar", async (ctx) => {
         reply_markup: order_list_menu
     })
 })
+bot.hears("📈 Kunlik hisobot", async (ctx) => {
+    let statistic_data = await statistic_daily();
+    await ctx.reply(`
+<b>📈 Kunlik xisobot</b>  
+
+💎 Buyurtmalar soni: <b>${statistic_data.all_count}</b>
+🚚 Yetkazilganlar : <b>${statistic_data.deliveried_count}</b>
+💰 To'lov qilingan : <b>${statistic_data.payment_count}</b>
+❗️ Rad etilgan : <b>${statistic_data.reject_count}</b>
+
+🗓 Sana : <b>${new Date().toLocaleDateString()}</b>
+   `, {
+        parse_mode: "HTML"
+    })
+})
+
+
+bot.hears("📊 Umumiy statistika", async (ctx) => {
+    let statistic_data = await general_statistic();
+    await ctx.reply(`
+ <b>📊 Umimiy statistika</b>  
+ 
+ 💎 Buyurtmalar soni: <b>${statistic_data.all_count}</b>
+ 🚚 Yetkazilganlar : <b>${statistic_data.deliveried_count}</b>
+ 💰 To'lov qilingan : <b>${statistic_data.payment_count}</b>
+ ❗️ Rad etilgan : <b>${statistic_data.reject_count}</b>
+ 
+ 👤 Mijozlar : <b>${statistic_data.users_count}</b>
+ 💸 Umumiy summa : <b>${statistic_data.total_price} so'm</b>
+    `, {
+        parse_mode: "HTML"
+    })
+})
+
+bot.hears("✍️ Xabar yuborish", async (ctx) => {
+
+    await ctx.conversation.enter("send_message_conversation");
 
 
 
+})
 
 
 
