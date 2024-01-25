@@ -24,8 +24,8 @@ const bot_token = process.env.BOT_TOKEN;
 const payme_tokent = process.env.PAYME_PROVIDER_TOKEN;
 
 
-const admin_id = 1246843100;
-const admin_list = [1246843100, 5604998397]
+const admin_id = 6232821453;
+const admin_list = [1246843100, 5604998397,6232821453]
 const connect_phone = '+998(97) 776-17-17'
 
 
@@ -533,7 +533,7 @@ async function order_product_conversation(conversation, ctx) {
         let payment_message = await ctx.reply(ctx.t("order_payment_info", {
             order_number: new_order.order_number,
             order_amout: new_order.order_amount,
-            order_price: new_order.order_amount * 15000,
+            order_price: new_order.order_amount * 20000,
             order_date: new Date(new_order.created_at).toLocaleDateString()
         }), {
             parse_mode: "HTML",

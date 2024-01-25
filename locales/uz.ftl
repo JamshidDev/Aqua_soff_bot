@@ -79,7 +79,7 @@ comment_success_text = ✅ Sizning xabaringiz adminga yuborildi!
 
 product_details = <b>🛍  Mahsulot haqida qisqacha:</b>
     Hajmi: <b>18.9 L</b>
-    Narxi (1 dona): <b>15 000 so'm</b>
+    Narxi (1 dona): <b>20 000 so'm</b>
 
     <i>Mahsulot miqdorini kiriting</i>
     Masalan: <b>10; 20; 30</b>
