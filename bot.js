@@ -24,8 +24,8 @@ const bot_token = process.env.BOT_TOKEN;
 const payme_tokent = process.env.PAYME_PROVIDER_TOKEN;
 
 
-const admin_id = 5982603775;
-const admin_list = [5982603775, 5604998397]
+const admin_id = 1246843100;
+const admin_list = [1246843100, 5604998397]
 const connect_phone = '+998(97) 776-17-17'
 
 
